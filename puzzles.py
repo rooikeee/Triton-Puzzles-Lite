@@ -216,6 +216,7 @@ def add_kernel(x_ptr, z_ptr, N0, B0: tl.constexpr):
     off_x = tl.arange(0, B0)
     x = tl.load(x_ptr + off_x)
     # Finish me!
+    tl.store(z_ptr+off_x, x+10.0)
     return
 
 
@@ -237,6 +238,11 @@ def add2_spec(x: Float32[200,]) -> Float32[200,]:
 @triton.jit
 def add_mask2_kernel(x_ptr, z_ptr, N0, B0: tl.constexpr):
     # Finish me!
+    block_id = tl.program_id(0)
+    off_x = block_id * B0 + tl.arange(0, B0)
+    mask = off_x < N0
+    x = tl.load(x_ptr+off_x, mask=mask)
+    tl.store(z_ptr+off_x, x+10.0, mask=mask)
     return
 
 
@@ -260,6 +266,13 @@ def add_vec_spec(x: Float32[32,], y: Float32[32,]) -> Float32[32, 32]:
 @triton.jit
 def add_vec_kernel(x_ptr, y_ptr, z_ptr, N0, N1, B0: tl.constexpr, B1: tl.constexpr):
     # Finish me!
+    off_x = tl.arange(0, B0)
+    off_y = tl.arange(0, B1)
+    off_z = off_y[:, None] * B0 + off_x[None, :]
+    
+    x = tl.load(x_ptr+off_x)[None, :]
+    y = tl.load(y_ptr+off_y)[:, None]
+    tl.store(z_ptr+off_z, x+y)
     return
 
 
@@ -287,7 +300,20 @@ def add_vec_block_kernel(
     block_id_x = tl.program_id(0)
     block_id_y = tl.program_id(1)
     # Finish me!
-    return
+    off_x = block_id_x * B0 + tl.arange(0, B0)
+    off_y = block_id_y * B1 + tl.arange(0, B1)
+    off_z = off_y[:, None] * N0 + off_x[None, :]
+    
+    mask_x = off_x < N0
+    mask_y = off_y < N1 
+    mask_z = mask_y[:, None] & mask_x[None, :]
+    
+    # load x and y
+    x = tl.load(x_ptr+off_x, mask=mask_x)
+    y = tl.load(y_ptr+off_y, mask=mask_y)
+    z = y[:, None] + x[None, :]
+    tl.store(z_ptr+off_z, z, mask=mask_z)
+    return 
 
 
 r"""
